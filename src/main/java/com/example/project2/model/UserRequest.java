@@ -1,7 +1,7 @@
 package com.example.project2.model;
 
 public class UserRequest {
-    private int id ;
+    private int id;
     private int amount;
 
     public UserRequest(int id, int amount) {

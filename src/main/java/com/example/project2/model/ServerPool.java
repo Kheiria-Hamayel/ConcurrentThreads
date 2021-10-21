@@ -1,10 +1,9 @@
 package com.example.project2.model;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.data.annotation.Id;
-import org.springframework.stereotype.Service;
 import javax.persistence.*;
+
+
 @Entity
 public class ServerPool {
 
@@ -13,7 +12,7 @@ public class ServerPool {
     private int serverMeme;
 
 
-    public ServerPool( int serverMeme) {
+    public ServerPool(int serverMeme) {
 
         this.serverMeme = serverMeme;
     }
@@ -43,24 +42,20 @@ public class ServerPool {
     }
 
 
+    public int updateMem(int amount) {
 
-     public synchronized int updateMem(int amount){
-         serverMeme = serverMeme - amount;
-
+        serverMeme = serverMeme - amount;
         return serverMeme;
-     }
+    }
 
-     public synchronized void askMem(){
-         serverMeme = serverMeme + 100;
-     }
-
-
+    public synchronized void askMem() {
+        serverMeme = serverMeme + 100;
+    }
 
 
-
-    public   int getMemSize(){
-         return serverMeme;
-     }
+    public int getMemSize() {
+        return serverMeme;
+    }
 
 
 }
