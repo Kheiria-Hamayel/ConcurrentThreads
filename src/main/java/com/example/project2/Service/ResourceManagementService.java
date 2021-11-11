@@ -3,25 +3,30 @@ package com.example.project2.Service;
 import com.example.project2.model.ServerPool;
 import com.example.project2.model.UserRequest;
 
+import com.example.project2.model.VirtualServer;
 import com.example.project2.repository.ServersPoolRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-
 import javax.annotation.PostConstruct;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
 @Service
 public class ResourceManagementService {
     Logger logger = LoggerFactory.getLogger(Service.class);
     List<ServerPool> serverList = new ArrayList<>();
-    ExecutorService executorService = Executors.newFixedThreadPool(4);
+    List<VirtualServer> virtualServerArrayList = new ArrayList<>();
     private ReentrantLock lock = new ReentrantLock();
+    private Condition condition = lock.newCondition();
+    private Condition condition2 = lock.newCondition();
+    private int sum = 0;
     private int count = 1;
     @Autowired
     private ServersPoolRepository serverRepository;
@@ -40,6 +45,19 @@ public class ResourceManagementService {
         serverList.add(serverPool);
     }
 
+    // searching inside the virtual server
+    public VirtualServer VirReCheck(UserRequest userRequest) {
+        if (virtualServerArrayList.isEmpty())
+            return null;
+        for (int i = 0; i < virtualServerArrayList.size(); i++) {
+            if (userRequest.getAmount() <= virtualServerArrayList.get(i).getServerPool().getMemSize()) {
+
+                return virtualServerArrayList.get(i);
+            }
+        }
+        return null;
+    }
+
     public ServerPool reCheck(UserRequest userRequest) {
 
         for (int i = 0; i < serverList.size(); i++) {
@@ -50,35 +68,49 @@ public class ResourceManagementService {
         }
         return null;
     }
-
-
-    public void allocate(UserRequest userRequest) {
-        executorService.submit(() -> {
-            lock.lock();
-            ServerPool serverPool = reCheck(userRequest);
-            if (serverPool != null) {
-                int val = serverPool.updateMem(userRequest.getAmount());
-                serverRepository.save(serverPool);
-                logger.info("from executor" + serverPool.getMemSize());
-            } else {
-                if (reCheck(userRequest) == null && userRequest.getAmount() <= 50) {
-                    try {
-                        Thread.sleep(10000);
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
-                    ServerPool serverPool2 = new ServerPool(count, 50);
-                    serverList.add(serverPool2);
-                    serverRepository.save(serverPool2);
-                    count++;
-                    logger.info("from else section ");
-                    allocate(userRequest);
-                } else if (reCheck(userRequest) != null) {
-                    logger.info("Testing ////purpose2");
-                    allocate(userRequest);
-                }
-            }
+    // allocation from the real servers
+    public void consume(UserRequest userRequest, ServerPool serverPool) {
+        if (serverPool != null) {
+            serverPool.updateMem(userRequest.getAmount());
+            serverPool.setUserRequests(userRequest);
+            serverRepository.save(serverPool);
+            logger.info("case 1 : enough space + list size " + serverPool.getUserRequests().size());
             lock.unlock();
-        });
+        }
+    }
+
+    public void allocate(UserRequest userRequest) throws InterruptedException {
+        lock.lock();
+        logger.info("the thread entered");
+        ServerPool serverPool = reCheck(userRequest);
+        consume(userRequest, serverPool);
+        VirtualServer virServerPool1 = VirReCheck(userRequest);
+        if (serverPool == null && virServerPool1 == null) {    // no space neither in real list nor in the virtual one
+            ServerPool server = new ServerPool(count, 50);
+            server.updateMem(userRequest.getAmount());
+            server.setUserRequests(userRequest);
+            virtualServerArrayList.add(new VirtualServer(server, sum));
+            logger.info("case 2 : no enough space neither in real list nor in the virtual one ");
+            count++;
+            condition.await(10000, TimeUnit.MILLISECONDS);
+            condition2.signalAll();
+            logger.info("lock released after 10 sec");
+            lock.unlock();
+            logger.info("lock released");
+            serverList.add(server); // the real list
+            serverRepository.save(server); // into database // the request wil l served while in the virtual
+            logger.info("Server arraylist size " + serverList.size()); // and then moved into database after serving
+            logger.info("virtual arraylist size " + virtualServerArrayList.size());
+        }
+        if (virServerPool1 != null && serverPool == null) {
+            if (userRequest.getAmount() <= virServerPool1.getServerPool().getMemSize()) {
+                virServerPool1.getServerPool().updateMem(userRequest.getAmount());
+                virServerPool1.getServerPool().setUserRequests(userRequest);
+                logger.info("the number of unserved threads is " + virServerPool1.getServerPool().getUserRequests().size());
+            }
+            condition2.await();
+            lock.unlock();
+        }
+        logger.info("the thread passed");
     }
 }
