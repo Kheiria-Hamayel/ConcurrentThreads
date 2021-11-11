@@ -6,7 +6,7 @@ import java.util.ArrayList;
 
 public class VirtualServer {
 private  ServerPool serverPool;
-ArrayList<UserRequest> userRequests = new ArrayList<>();
+
 
 
     public VirtualServer(ServerPool serverPool) {
@@ -22,12 +22,5 @@ ArrayList<UserRequest> userRequests = new ArrayList<>();
         this.serverPool = serverPool;
     }
 
-    public ArrayList<UserRequest> getUserRequests() {
-        return userRequests;
-    }
-
-    public void setUserRequests(UserRequest userRequest) {
-        this.userRequests.add(userRequest);
-    }
 
 }
