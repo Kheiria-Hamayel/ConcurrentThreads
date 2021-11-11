@@ -12,8 +12,6 @@ import org.springframework.stereotype.Service;
 import javax.annotation.PostConstruct;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
@@ -26,7 +24,6 @@ public class ResourceManagementService {
     private ReentrantLock lock = new ReentrantLock();
     private Condition condition = lock.newCondition();
     private Condition condition2 = lock.newCondition();
-    private int sum = 0;
     private int count = 1;
     @Autowired
     private ServersPoolRepository serverRepository;
@@ -89,7 +86,7 @@ public class ResourceManagementService {
             ServerPool server = new ServerPool(count, 50);
             server.updateMem(userRequest.getAmount());
             server.setUserRequests(userRequest);
-            virtualServerArrayList.add(new VirtualServer(server, sum));
+            virtualServerArrayList.add(new VirtualServer(server));
             logger.info("case 2 : no enough space neither in real list nor in the virtual one ");
             count++;
             condition.await(10000, TimeUnit.MILLISECONDS);
